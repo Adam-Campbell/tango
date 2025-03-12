@@ -124,6 +124,8 @@ export class LogicalSolver {
         if (deductionMade) return true;
         deductionMade = this.checkEqualConstraintNeighbourImplication();
         if (deductionMade) return true;
+        deductionMade = this.checkFilledCellsOppositeImplication();
+        if (deductionMade) return true;
         // Perform symbol fully allocated check
         for (let i = 0; i < this.puzzle.grid.length; i++) {
             const row = this.puzzle.grid[i];
@@ -153,6 +155,14 @@ export class LogicalSolver {
             if (deductionMade) return true;
             const col = this.getColumn(i);
             deductionMade = this.checkSeparatedMatchingImplication(col);
+            if (deductionMade) return true;
+        }
+        for (let i = 0; i < this.puzzle.grid.length; i++) {
+            const row = this.puzzle.grid[i];
+            deductionMade = this.checkPairAtEdgeImplication(row);
+            if (deductionMade) return true;
+            const col = this.getColumn(i);
+            deductionMade = this.checkPairAtEdgeImplication(col);
             if (deductionMade) return true;
         }
         // Return false if no deductions could be made.
@@ -361,16 +371,141 @@ export class LogicalSolver {
         return false;
     }
 
-    private checkFilledCellsOppositeImplication() {
+    private checkFilledCellsOppositeImplication(): boolean {
         // If a row/col already contains two cells of value A, and it has an OPPOSITE constraint,
         // then any other cells (other than the first two mentioned and the cells involved in the
         // OPPOSITE constraint) must have value B.
+
+        // Grab all empty OPPOSITE constraints.
+        // For a given constraint, inspect the rowOrCol:
+        // If the rowOrCol has two cells of value A, then every empty cell not involved in
+        // the constraint has value B.
+        //
+        //
+        const emptyOppositeConstraints = this.puzzle.constraints.filter(
+            (constraint) => {
+                const [pos1, pos2] = constraint.cells;
+                return (
+                    constraint.type === "OPPOSITE" &&
+                    this.getCell(...pos1) === 0 &&
+                    this.getCell(...pos2) === 0
+                );
+            }
+        );
+        for (const constraint of emptyOppositeConstraints) {
+            const [pos1, pos2] = constraint.cells;
+            const isHorizontal = pos1[0] === pos2[0];
+            if (isHorizontal) {
+                const row = this.puzzle.grid[pos1[0]];
+                let symbolOneCount = 0;
+                let symbolTwoCount = 0;
+                for (let i = 0; i < row.length; i++) {
+                    const el = row[i];
+                    if (el === 1) {
+                        symbolOneCount++;
+                    } else if (el === 2) {
+                        symbolTwoCount++;
+                    }
+                }
+                // If every cell not involved in the constraint already has a value
+                if (symbolOneCount === 2 && symbolTwoCount === 2) {
+                    continue;
+                } else if (symbolOneCount === 2) {
+                    let hasChanged = false;
+                    for (let i = 0; i < row.length; i++) {
+                        if (i === pos1[1] || i === pos2[1]) {
+                            continue;
+                        }
+                        if (row[i] === 0) {
+                            row[i] = 2;
+                            hasChanged = true;
+                        }
+                    }
+                    if (hasChanged) return true;
+                } else if (symbolTwoCount === 2) {
+                    let hasChanged = false;
+                    for (let i = 0; i < row.length; i++) {
+                        if (i === pos1[1] || i === pos2[1]) {
+                            continue;
+                        }
+                        if (row[i] === 0) {
+                            row[i] = 1;
+                            hasChanged = true;
+                        }
+                    }
+                    if (hasChanged) return true;
+                }
+            } else {
+                const col = this.getColumn(pos1[1]);
+                let symbolOneCount = 0;
+                let symbolTwoCount = 0;
+                for (let i = 0; i < col.length; i++) {
+                    const el = col[i];
+                    if (el === 1) {
+                        symbolOneCount++;
+                    } else if (el === 2) {
+                        symbolTwoCount++;
+                    }
+                }
+                // If every cell not involved in the constraint already has a value
+                if (symbolOneCount === 2 && symbolTwoCount === 2) {
+                    continue;
+                } else if (symbolOneCount === 2) {
+                    let hasChanged = false;
+                    for (let i = 0; i < col.length; i++) {
+                        if (i === pos1[0] || i === pos2[0]) {
+                            continue;
+                        }
+                        if (col[i] === 0) {
+                            col[i] = 2;
+                            hasChanged = true;
+                        }
+                    }
+                    if (hasChanged) return true;
+                } else if (symbolTwoCount === 2) {
+                    let hasChanged = false;
+                    for (let i = 0; i < col.length; i++) {
+                        if (i === pos1[0] || i === pos2[0]) {
+                            continue;
+                        }
+                        if (col[i] === 0) {
+                            col[i] = 1;
+                            hasChanged = true;
+                        }
+                    }
+                    if (hasChanged) return true;
+                }
+            }
+        }
+        return false;
     }
 
-    private checkFilledCellsOppositeChainImplication() {
+    // Leaving this for now because I THINK it is made redundant by
+    // checkFilledCellsOppositeImplication.
+    private UNUSED_checkFilledCellsOppositeChainImplication(): boolean {
         // If a row/col has a chain of two OPPOSITE constraints (thus involving three cells), and
         // two cells that are not involved in this chain which both have value A, then the middle
         // cell in the chain has value A and the two outer cells in the chain have value B.
+        return false;
+    }
+
+    private checkPairAtEdgeImplication(rowOrCol: Cell[]): boolean {
+        // If the first two cells at one end have value A, then the cell at the other end must
+        // have value B (because if it had value A then we would force a situation where 3
+        // consecutive internal cells had value B).
+        const first = rowOrCol[0];
+        const second = rowOrCol[1];
+        const penultimate = rowOrCol[4];
+        const last = rowOrCol[5];
+        if (first === second && last === 0) {
+            rowOrCol[5] = this.getOppositeSymbol(first);
+            return true;
+        } else if (penultimate === last && first === 0) {
+            rowOrCol[0] = this.getOppositeSymbol(last);
+            return true;
+        }
+
+        return false;
     }
 
     private checkAdjacentMatchingImplication(rowOrCol: Cell[]): boolean {
@@ -488,6 +623,14 @@ export class LogicalSolver {
             }
         }
         return false;
+    }
+
+    private checkEmptyOuterEqualsOppositeEdgeFilledImplication(): boolean {
+        // If there is an empty EQUAL constraint at one edge of row/col, and
+        // the cell at the opposite end has value A, then the cells in the EQUAL
+        // constraint must have value B (if they had value A then they would force
+        // three consecutive interior B's).
+        return true;
     }
 
     /**

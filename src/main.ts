@@ -8,6 +8,7 @@ import {
     PuzzleState,
 } from "./types";
 import { LogicalSolver } from "./logicalSolver";
+import { INITIAL_STATES } from "./data";
 
 /**
  * It might actually be nicer to split this up into checking row and column separately.
@@ -373,62 +374,7 @@ function generateCompleteValidPuzzle(): PuzzleState {
     };
 }
 
-console.log(generateCompleteValidPuzzle());
+//console.log(generateCompleteValidPuzzle());
 
-const TEST_INITIAL_PUZZLE_STATE: PuzzleState = {
-    grid: [
-        [0, 0, 0, 2, 0, 1],
-        [0, 0, 0, 1, 0, 1],
-        [0, 0, 0, 1, 1, 2],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0],
-    ],
-    constraints: [
-        {
-            type: "EQUAL",
-            cells: [
-                [3, 0],
-                [3, 1],
-            ],
-        },
-        {
-            type: "OPPOSITE",
-            cells: [
-                [3, 1],
-                [3, 2],
-            ],
-        },
-        {
-            type: "OPPOSITE",
-            cells: [
-                [3, 0],
-                [4, 0],
-            ],
-        },
-        {
-            type: "EQUAL",
-            cells: [
-                [3, 2],
-                [4, 2],
-            ],
-        },
-        {
-            type: "EQUAL",
-            cells: [
-                [4, 0],
-                [5, 0],
-            ],
-        },
-        {
-            type: "OPPOSITE",
-            cells: [
-                [4, 2],
-                [5, 2],
-            ],
-        },
-    ],
-};
-
-const solver = new LogicalSolver(TEST_INITIAL_PUZZLE_STATE);
+const solver = new LogicalSolver(INITIAL_STATES[2]);
 window.solver = solver;
