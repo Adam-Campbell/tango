@@ -117,8 +117,12 @@ export class LogicalSolver {
      */
     public makeDeduction(): boolean {
         let deductionMade = false;
-        // Perform constraints check
+        // Perform constraints checks
         deductionMade = this.checkConstraints();
+        if (deductionMade) return true;
+        deductionMade = this.checkFilledCellsEqualsConflict();
+        if (deductionMade) return true;
+        deductionMade = this.checkEqualConstraintNeighbourImplication();
         if (deductionMade) return true;
         // Perform symbol fully allocated check
         for (let i = 0; i < this.puzzle.grid.length; i++) {
@@ -259,12 +263,13 @@ export class LogicalSolver {
         rowOrCol: Cell[],
         symbol: 1 | 2
     ): boolean {
+        //debugger;
         //If any row or column contains 3 cells of value A, you can fill in the remaining
         //spaces with value B.
         let hasChanged = false;
         let count = 0;
-        for (const cell in rowOrCol) {
-            const cellValue = Number(cell);
+        for (let i = 0; i < rowOrCol.length; i++) {
+            const cellValue = Number(rowOrCol[i]);
             if (cellValue === symbol) {
                 count++;
             }
@@ -418,10 +423,71 @@ export class LogicalSolver {
         return false;
     }
 
-    private checkEqualConstraintNeighbourImplication() {
+    private checkEqualConstraintNeighbourImplication(): boolean {
         // If a row/col has an EQUAL constraint and if the cell either directly before or after the
         // two cells involved in this constraint has value A, then the two cells involved in the
         // EQUAL constraint both have value B.
+        const emptyEqualsConstraints = this.puzzle.constraints.filter(
+            (constraint) => {
+                const [pos1, pos2] = constraint.cells;
+                return (
+                    constraint.type === "EQUAL" &&
+                    this.getCell(...pos1) === 0 &&
+                    this.getCell(...pos2) === 0
+                );
+            }
+        );
+        for (const constraint of emptyEqualsConstraints) {
+            const [pos1, pos2] = constraint.cells;
+            const isHorizontal = pos1[0] === pos2[0];
+            if (isHorizontal) {
+                const row = this.puzzle.grid[pos1[0]];
+                const startIndex = Math.min(pos1[1], pos2[1]);
+                const endIndex = Math.max(pos1[1], pos2[1]);
+                if (startIndex > 0 && row[startIndex - 1] !== 0) {
+                    const oppositeSymbol = this.getOppositeSymbol(
+                        row[startIndex - 1]
+                    );
+                    row[startIndex] = oppositeSymbol;
+                    row[endIndex] = oppositeSymbol;
+                    return true;
+                } else if (
+                    endIndex < row.length - 1 &&
+                    row[endIndex + 1] !== 0
+                ) {
+                    const oppositeSymbol = this.getOppositeSymbol(
+                        row[endIndex + 1]
+                    );
+                    row[startIndex] = oppositeSymbol;
+                    row[endIndex] = oppositeSymbol;
+                    return true;
+                }
+                // Else cells are vertical
+            } else {
+                const col = this.getColumn(pos1[1]);
+                const startIndex = Math.min(pos1[0], pos2[0]);
+                const endIndex = Math.max(pos1[0], pos2[0]);
+                if (startIndex > 0 && col[startIndex - 1] !== 0) {
+                    const oppositeSymbol = this.getOppositeSymbol(
+                        col[startIndex - 1]
+                    );
+                    col[startIndex] = oppositeSymbol;
+                    col[endIndex] = oppositeSymbol;
+                    return true;
+                } else if (
+                    endIndex < col.length - 1 &&
+                    col[endIndex + 1] !== 0
+                ) {
+                    const oppositeSymbol = this.getOppositeSymbol(
+                        col[endIndex + 1]
+                    );
+                    col[startIndex] = oppositeSymbol;
+                    col[endIndex] = oppositeSymbol;
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
