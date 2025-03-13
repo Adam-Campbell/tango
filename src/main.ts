@@ -170,7 +170,7 @@ function getConfiguredRow(): Cell[] {
     return row;
 }
 
-console.log(getConfiguredRow());
+//console.log(getConfiguredRow());
 
 /**
  * Generates a valid complete grid by repeatedly generating rows until a valid grid is found.
@@ -376,5 +376,5 @@ function generateCompleteValidPuzzle(): PuzzleState {
 
 //console.log(generateCompleteValidPuzzle());
 
-const solver = new LogicalSolver(INITIAL_STATES[2]);
+const solver = new LogicalSolver(INITIAL_STATES[4]);
 window.solver = solver;

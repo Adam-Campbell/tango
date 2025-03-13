@@ -126,6 +126,9 @@ export class LogicalSolver {
         if (deductionMade) return true;
         deductionMade = this.checkFilledCellsOppositeImplication();
         if (deductionMade) return true;
+        deductionMade =
+            this.checkEmptyOuterEqualsOppositeEdgeFilledImplication();
+        if (deductionMade) return true;
         // Perform symbol fully allocated check
         for (let i = 0; i < this.puzzle.grid.length; i++) {
             const row = this.puzzle.grid[i];
@@ -163,6 +166,24 @@ export class LogicalSolver {
             if (deductionMade) return true;
             const col = this.getColumn(i);
             deductionMade = this.checkPairAtEdgeImplication(col);
+            if (deductionMade) return true;
+        }
+        // Perform outer match implication checks
+        for (let i = 0; i < this.puzzle.grid.length; i++) {
+            const row = this.puzzle.grid[i];
+            deductionMade = this.checkOuterMatchImplication(row);
+            if (deductionMade) return true;
+            const col = this.getColumn(i);
+            deductionMade = this.checkOuterMatchImplication(col);
+            if (deductionMade) return true;
+        }
+        // Perform outer interior match implication checks
+        for (let i = 0; i < this.puzzle.grid.length; i++) {
+            const row = this.puzzle.grid[i];
+            deductionMade = this.checkOuterInteriorMatchImplication(row);
+            if (deductionMade) return true;
+            const col = this.getColumn(i);
+            deductionMade = this.checkOuterInteriorMatchImplication(col);
             if (deductionMade) return true;
         }
         // Return false if no deductions could be made.
@@ -230,6 +251,7 @@ export class LogicalSolver {
      * Check the constraints to see if there are any direct deductions we can make.
      */
     private checkConstraints(): boolean {
+        //console.log("checkConstraints called");
         // For each constraint, check the values of the two cells. If we know the
         // value of exactly one of them, then directly infer the value of the other.
         const { grid, constraints } = this.puzzle;
@@ -273,6 +295,7 @@ export class LogicalSolver {
         rowOrCol: Cell[],
         symbol: 1 | 2
     ): boolean {
+        //console.log("checkSymbolIsFullyAllocated called");
         //debugger;
         //If any row or column contains 3 cells of value A, you can fill in the remaining
         //spaces with value B.
@@ -306,6 +329,7 @@ export class LogicalSolver {
         // Determine if row/col already has two of relevant symbol.
         // OR, do we start off by looking at a specific row/col, and then find any constraints
         // contained entirely in that row/col?
+        //console.log("checkFilledCellsEqualsConflict called");
         const emptyEqualsConstraints = this.puzzle.constraints.filter(
             (constraint) => {
                 const [pos1, pos2] = constraint.cells;
@@ -382,6 +406,7 @@ export class LogicalSolver {
         // the constraint has value B.
         //
         //
+        //console.log("checkFilledCellsOppositeImplication called");
         const emptyOppositeConstraints = this.puzzle.constraints.filter(
             (constraint) => {
                 const [pos1, pos2] = constraint.cells;
@@ -493,14 +518,15 @@ export class LogicalSolver {
         // If the first two cells at one end have value A, then the cell at the other end must
         // have value B (because if it had value A then we would force a situation where 3
         // consecutive internal cells had value B).
+        //console.log("checkPairAtEdgeImplication called");
         const first = rowOrCol[0];
         const second = rowOrCol[1];
         const penultimate = rowOrCol[4];
         const last = rowOrCol[5];
-        if (first === second && last === 0) {
+        if (first === second && first !== 0 && last === 0) {
             rowOrCol[5] = this.getOppositeSymbol(first);
             return true;
-        } else if (penultimate === last && first === 0) {
+        } else if (penultimate === last && last !== 0 && first === 0) {
             rowOrCol[0] = this.getOppositeSymbol(last);
             return true;
         }
@@ -512,6 +538,7 @@ export class LogicalSolver {
         // If there are two adjacent cells with value A, then the cells either side of them must
         // have value B.
         //debugger;
+        //console.log("checkAdjacentMatchingImplication called");
         let index1 = 0;
         let index2 = 1;
         while (index2 < rowOrCol.length) {
@@ -541,6 +568,7 @@ export class LogicalSolver {
     private checkSeparatedMatchingImplication(rowOrCol: Cell[]): boolean {
         // If there are two cells with value A and a gap of one cell between them, then that cell
         // must have value B.
+        //console.log("checkSeparatedMatchingImplication called");
         let index1 = 0;
         let index2 = 1;
         let index3 = 2;
@@ -562,6 +590,7 @@ export class LogicalSolver {
         // If a row/col has an EQUAL constraint and if the cell either directly before or after the
         // two cells involved in this constraint has value A, then the two cells involved in the
         // EQUAL constraint both have value B.
+        //console.log("checkEqualConstraintNeighbourImplication called");
         const emptyEqualsConstraints = this.puzzle.constraints.filter(
             (constraint) => {
                 const [pos1, pos2] = constraint.cells;
@@ -630,7 +659,103 @@ export class LogicalSolver {
         // the cell at the opposite end has value A, then the cells in the EQUAL
         // constraint must have value B (if they had value A then they would force
         // three consecutive interior B's).
-        return true;
+
+        // Filter constraints until we have just the empty EQUAL constraints.
+        // For each:
+        //   Determine whether horizontal or vertical
+        //   Determine whether they are at one end of the row or column.
+        //   Determine whether the other end of the row or column has a value.
+        //   If so, the constraint cells have the opposite value.
+        //console.log(
+        //    "checkEmptyOuterEqualsOppositeEdgeFilledImplication called"
+        //);
+        const emptyEqualsConstraints = this.puzzle.constraints.filter(
+            (constraint) => {
+                const [pos1, pos2] = constraint.cells;
+                return (
+                    constraint.type === "EQUAL" &&
+                    this.getCell(...pos1) === 0 &&
+                    this.getCell(...pos2) === 0
+                );
+            }
+        );
+        for (const constraint of emptyEqualsConstraints) {
+            const [pos1, pos2] = constraint.cells;
+            const isHorizontal = pos1[0] === pos2[0];
+            if (isHorizontal) {
+                // If at one end
+                const row = this.puzzle.grid[pos1[0]];
+                const start = Math.min(pos1[1], pos2[1]);
+                const end = Math.max(pos1[1], pos2[1]);
+                if (start === 0 && row[5] !== 0) {
+                    const oppositeSymbol = this.getOppositeSymbol(row[5]);
+                    row[start] = oppositeSymbol;
+                    row[end] = oppositeSymbol;
+                    return true;
+                } else if (end === 5 && row[0] !== 0) {
+                    const oppositeSymbol = this.getOppositeSymbol(row[0]);
+                    row[start] = oppositeSymbol;
+                    row[end] = oppositeSymbol;
+                    return true;
+                }
+                // And if other end has value
+            } else {
+                const col = this.getColumn(pos1[1]);
+                const start = Math.min(pos1[0], pos2[0]);
+                const end = Math.max(pos1[0], pos2[0]);
+                if (start === 0 && col[5] !== 0) {
+                    const oppositeSymbol = this.getOppositeSymbol(col[5]);
+                    col[start] = oppositeSymbol;
+                    col[end] = oppositeSymbol;
+                    return true;
+                } else if (end === 5 && col[0] !== 0) {
+                    const oppositeSymbol = this.getOppositeSymbol(col[0]);
+                    col[start] = oppositeSymbol;
+                    col[end] = oppositeSymbol;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private checkOuterMatchImplication(rowOrCol: Cell[]): boolean {
+        // If the first and last cells both have value A, then the second and penultimate
+        // have value B
+        //console.log("checkOuterMatchImplication called");
+        const first = rowOrCol[0];
+        const second = rowOrCol[1];
+        const penultimate = rowOrCol[4];
+        const last = rowOrCol[5];
+        if (
+            first === last &&
+            first !== 0 &&
+            (second === 0 || penultimate === 0)
+        ) {
+            const oppositeSymbol = this.getOppositeSymbol(first);
+            rowOrCol[1] = oppositeSymbol;
+            rowOrCol[4] = oppositeSymbol;
+            return true;
+        }
+        return false;
+    }
+
+    private checkOuterInteriorMatchImplication(rowOrCol: Cell[]): boolean {
+        //console.log("checkOuterInteriorMatchImplication called");
+        const first = rowOrCol[0];
+        const second = rowOrCol[1];
+        const penultimate = rowOrCol[4];
+        const last = rowOrCol[5];
+        if (first === penultimate && first !== 0 && last === 0) {
+            const oppositeSymbol = this.getOppositeSymbol(first);
+            rowOrCol[5] = oppositeSymbol;
+            return true;
+        } else if (second === last && second !== 0 && first === 0) {
+            const oppositeSymbol = this.getOppositeSymbol(second);
+            rowOrCol[0] = oppositeSymbol;
+            return true;
+        }
+        return false;
     }
 
     /**
